@@ -93,7 +93,7 @@ export class Lobby {
     this.roleRevealTimer = setTimeout(() => {
       this.status = "playing";
       io.to(this.code).emit("lobby_update", this.state);
-    }, 3000);
+    }, 5000);
   }
 
   private pickWinningCategory(): CategoryId {

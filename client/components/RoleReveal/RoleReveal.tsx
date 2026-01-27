@@ -35,8 +35,7 @@ export default function RoleReveal({ role, category }: RoleRevealProps) {
       </div>
 
       <div
-        className={`z-10 bg-[#F5DEB3] px-10 py-8 border-4 ${style.border} ${style.glow} text-center`}
-      >
+        className={`z-10 bg-[#F5DEB3] px-10 py-8 border-4 ${style.border} ${style.glow} text-center`}>
         <p className="text-xl text-black font-bold mb-2">YOUR ROLE</p>
         <h1 className={`text-5xl font-bold tracking-widest ${style.color}`}>
           {style.label}

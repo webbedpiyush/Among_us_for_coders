@@ -4,6 +4,7 @@ import { useEffect, use, useState } from "react";
 import { useRouter } from "next/navigation";
 import CategoryVoting from "@/components/CategoryVoting/CategoryVoting";
 import RoleReveal from "@/components/RoleReveal/RoleReveal";
+import GameScreen from "@/components/Game/GameScreen";
 import { useGame } from "@/context/GameContext";
 
 export default function GamePage({ params }: { params: Promise<{ code: string }> }) {
@@ -48,12 +49,11 @@ export default function GamePage({ params }: { params: Promise<{ code: string }>
     return <RoleReveal role={currentPlayer.role} category={gameState.category} />;
   }
 
-  if (gameState.status === "role_reveal") {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-[#87CEEB]">
-        <div className="text-white text-2xl font-bold animate-bounce">Revealing role...</div>
-      </div>
-    );
+  // Removed the fallback "Revealing role..." block so it falls through to "Game Starting..."
+
+
+  if (gameState.status === "playing") {
+    return <GameScreen gameState={gameState} currentPlayer={currentPlayer} />;
   }
 
   return (
