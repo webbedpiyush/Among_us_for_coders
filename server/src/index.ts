@@ -29,17 +29,16 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
+import { setupSocketHandlers } from "./socket/handlers";
+
 // Socket.IO connection handling
 io.on("connection", (socket: Socket) => {
   console.log(`Client connected: ${socket.id}`);
 
+  setupSocketHandlers(io, socket);
+
   socket.on("disconnect", () => {
     console.log(`Client disconnected: ${socket.id}`);
-  });
-
-  // Placeholder for game events - will be implemented in later steps
-  socket.on("ping", () => {
-    socket.emit("pong", { message: "Server is alive!", timestamp: Date.now() });
   });
 });
 
