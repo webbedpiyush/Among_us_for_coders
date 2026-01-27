@@ -11,6 +11,8 @@ interface GameContextType {
   createLobby: (playerName: string) => void;
   joinLobby: (lobbyCode: string, playerName: string) => void;
   leaveLobby: () => void;
+  startGame: () => void;
+  voteCategory: (categoryId: string) => void;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -18,6 +20,7 @@ const GameContext = createContext<GameContextType | undefined>(undefined);
 type GameAction =
   | { type: "SET_GAME_STATE"; payload: GameState }
   | { type: "SET_CURRENT_PLAYER"; payload: Player }
+  | { type: "SET_CURRENT_ROLE"; payload: Player["role"] }
   | { type: "RESET_GAME" };
 
 const initialState: { gameState: GameState | null; currentPlayer: Player | null } = {
@@ -30,7 +33,20 @@ function gameReducer(state: typeof initialState, action: GameAction) {
     case "SET_GAME_STATE":
       return { ...state, gameState: action.payload };
     case "SET_CURRENT_PLAYER":
-      return { ...state, currentPlayer: action.payload };
+      // Preserve role if the new player object doesn't have one (because server stripped it)
+      return {
+        ...state,
+        currentPlayer: {
+          ...action.payload,
+          role: action.payload.role || state.currentPlayer?.role,
+        },
+      };
+    case "SET_CURRENT_ROLE":
+      if (!state.currentPlayer) return state;
+      return {
+        ...state,
+        currentPlayer: { ...state.currentPlayer, role: action.payload },
+      };
     case "RESET_GAME":
       return initialState;
     default:
@@ -73,11 +89,17 @@ export function GameProvider({ children }: { children: ReactNode }) {
       alert(`Error: ${error.message}`);
     });
 
+    socket.on("role_assigned", (data: { role: Player["role"] }) => {
+      console.log("Role assigned:", data);
+      dispatch({ type: "SET_CURRENT_ROLE", payload: data.role });
+    });
+
     return () => {
       socket.off("lobby_created");
       socket.off("lobby_joined");
       socket.off("lobby_update");
       socket.off("error");
+      socket.off("role_assigned");
     };
   }, [socket, router]);
 
@@ -102,6 +124,18 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const startGame = () => {
+    if (socket) {
+      socket.emit("start_game");
+    }
+  };
+
+  const voteCategory = (categoryId: string) => {
+    if (socket) {
+      socket.emit("vote_category", { categoryId });
+    }
+  };
+
   return (
     <GameContext.Provider
       value={{
@@ -110,6 +144,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
         createLobby,
         joinLobby,
         leaveLobby,
+        startGame,
+        voteCategory,
       }}
     >
       {children}

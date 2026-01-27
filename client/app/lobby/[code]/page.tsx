@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 
 export default function LobbyPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = use(params);
-  const { gameState, currentPlayer, leaveLobby } = useGame();
+  const { gameState, currentPlayer, startGame } = useGame();
   const router = useRouter();
 
   useEffect(() => {
@@ -17,6 +17,12 @@ export default function LobbyPage({ params }: { params: Promise<{ code: string }
       router.replace("/");
     }
   }, [gameState, router]);
+
+  useEffect(() => {
+    if (gameState && gameState.status !== "waiting") {
+      router.replace(`/game/${code}`);
+    }
+  }, [gameState, router, code]);
 
   if (!gameState || !currentPlayer) {
     return (
@@ -31,7 +37,7 @@ export default function LobbyPage({ params }: { params: Promise<{ code: string }
       lobbyCode={code}
       players={gameState.players}
       currentPlayerId={currentPlayer.id}
-      onStartGame={() => console.log("Start game clicked")}
+      onStartGame={startGame}
     />
   );
 }

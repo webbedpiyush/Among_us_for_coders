@@ -59,6 +59,38 @@ export function setupSocketHandlers(io: Server, socket: Socket) {
     console.log(`${playerName} joined lobby ${lobbyCode}`);
   });
 
+  socket.on("start_game", () => {
+    const lobby = gameManager.getLobbyBySocketId(socket.id);
+    if (!lobby) {
+      socket.emit("error", { message: "Lobby not found" });
+      return;
+    }
+
+    const player = lobby.getPlayer(socket.id);
+    if (!player?.isHost) {
+      socket.emit("error", { message: "Only the host can start the game" });
+      return;
+    }
+
+    const started = lobby.startCategoryVoting(io);
+    if (!started) {
+      socket.emit("error", { message: "Unable to start game right now" });
+    }
+  });
+
+  socket.on("vote_category", (data: { categoryId: string }) => {
+    const lobby = gameManager.getLobbyBySocketId(socket.id);
+    if (!lobby) {
+      socket.emit("error", { message: "Lobby not found" });
+      return;
+    }
+
+    const success = lobby.voteCategory(socket.id, data.categoryId);
+    if (!success) {
+      socket.emit("error", { message: "Unable to vote for category" });
+    }
+  });
+
   socket.on("disconnect", () => {
     const lobby = gameManager.getLobbyBySocketId(socket.id);
     if (lobby) {
