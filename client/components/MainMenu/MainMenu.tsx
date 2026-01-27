@@ -2,28 +2,22 @@
 
 import { useState } from "react";
 import { Icon } from "@iconify/react";
-import { useSocket } from "@/hooks/useSocket";
-import { useRouter } from "next/navigation";
+import { useGame } from "@/context/GameContext";
 
 export default function MainMenu() {
   const [view, setView] = useState<"menu" | "create" | "join">("menu");
   const [playerName, setPlayerName] = useState("");
   const [lobbyCode, setLobbyCode] = useState("");
-  const { socket } = useSocket();
-  const router = useRouter();
+  const { createLobby, joinLobby } = useGame();
 
   const handleCreateGame = () => {
-    if (!playerName.trim() || !socket) return;
-    
-    socket.emit("create_lobby", { playerName });
-    // Note: We'll listen for 'lobby_created' event in a global listener or here
-    // For now, let's assume we'll redirect after event
+    if (!playerName.trim()) return;
+    createLobby(playerName);
   };
 
   const handleJoinGame = () => {
-    if (!playerName.trim() || !lobbyCode.trim() || !socket) return;
-
-    socket.emit("join_lobby", { lobbyCode, playerName });
+    if (!playerName.trim() || !lobbyCode.trim()) return;
+    joinLobby(lobbyCode, playerName);
   };
 
   return (
