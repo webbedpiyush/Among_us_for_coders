@@ -8,26 +8,42 @@ import { useRouter } from "next/navigation";
 interface GameContextType {
   gameState: GameState | null;
   currentPlayer: Player | null;
+  chatMessages: ChatMessage[];
   createLobby: (playerName: string) => void;
   joinLobby: (lobbyCode: string, playerName: string) => void;
   leaveLobby: () => void;
   startGame: () => void;
   voteCategory: (categoryId: string) => void;
   updateCode: (code: string) => void;
+  sendChatMessage: (text: string) => void;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
+
+export interface ChatMessage {
+  id: string;
+  senderId?: string;
+  senderName: string;
+  text: string;
+  isSystem?: boolean;
+}
 
 type GameAction =
   | { type: "SET_GAME_STATE"; payload: GameState }
   | { type: "SET_CURRENT_PLAYER"; payload: Player }
   | { type: "SET_CURRENT_ROLE"; payload: Player["role"] }
   | { type: "SET_CODE"; payload: string }
+  | { type: "ADD_CHAT_MESSAGE"; payload: ChatMessage }
   | { type: "RESET_GAME" };
 
-const initialState: { gameState: GameState | null; currentPlayer: Player | null } = {
+const initialState: {
+  gameState: GameState | null;
+  currentPlayer: Player | null;
+  chatMessages: ChatMessage[];
+} = {
   gameState: null,
   currentPlayer: null,
+  chatMessages: [],
 };
 
 function gameReducer(state: typeof initialState, action: GameAction) {
@@ -55,6 +71,8 @@ function gameReducer(state: typeof initialState, action: GameAction) {
         ...state,
         gameState: { ...state.gameState, code: action.payload },
       };
+    case "ADD_CHAT_MESSAGE":
+      return { ...state, chatMessages: [...state.chatMessages, action.payload] };
     case "RESET_GAME":
       return initialState;
     default:
@@ -108,6 +126,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "SET_CODE", payload: data.code });
     });
 
+    socket.on("chat_message", (data: ChatMessage) => {
+      dispatch({ type: "ADD_CHAT_MESSAGE", payload: data });
+    });
+
     return () => {
       socket.off("lobby_created");
       socket.off("lobby_joined");
@@ -115,6 +137,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       socket.off("error");
       socket.off("role_assigned");
       socket.off("code_sync");
+      socket.off("chat_message");
     };
   }, [socket, router]);
 
@@ -157,17 +180,25 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const sendChatMessage = (text: string) => {
+    if (socket) {
+      socket.emit("chat_message", { text });
+    }
+  };
+
   return (
     <GameContext.Provider
       value={{
         gameState: state.gameState,
         currentPlayer: state.currentPlayer,
+        chatMessages: state.chatMessages,
         createLobby,
         joinLobby,
         leaveLobby,
         startGame,
         voteCategory,
         updateCode,
+        sendChatMessage,
       }}
     >
       {children}

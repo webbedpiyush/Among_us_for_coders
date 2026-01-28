@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Icon } from "@iconify/react";
 import { GameState, Player } from "@/types/game";
 import { useGame } from "@/context/GameContext";
@@ -15,11 +15,7 @@ interface GameScreenProps {
 }
 
 export default function GameScreen({ gameState, currentPlayer }: GameScreenProps) {
-  const { updateCode } = useGame();
-  const [messages, setMessages] = useState([
-    { id: "1", sender: "System", text: "Game started!", color: "text-gray-500", isSystem: true },
-    { id: "2", sender: currentPlayer.name, text: "Good luck everyone!", color: "text-blue-500" },
-  ]);
+  const { updateCode, chatMessages, sendChatMessage } = useGame();
   const emitTimerRef = useRef<NodeJS.Timeout | null>(null);
   const editorRef = useRef<any>(null);
   const codeRef = useRef<string>(gameState.code || "# Write your code here");
@@ -109,18 +105,34 @@ export default function GameScreen({ gameState, currentPlayer }: GameScreenProps
 
         {/* Right Panel: Chat */}
         <Chat 
-          messages={messages}
+          messages={chatMessages.map((msg) => ({
+            id: msg.id,
+            sender: msg.senderName,
+            text: msg.text,
+            isSystem: msg.isSystem,
+            color: getSenderColor(msg.senderId || msg.senderName),
+          }))}
           currentPlayerName={currentPlayer.name}
-          onSendMessage={(text) => {
-            setMessages([...messages, { 
-              id: Date.now().toString(), 
-              sender: currentPlayer.name, 
-              text, 
-              color: "text-blue-500" 
-            }]);
-          }}
+          onSendMessage={sendChatMessage}
         />
       </div>
     </div>
   );
+}
+
+function getSenderColor(seed: string) {
+  const colors = [
+    "text-red-500",
+    "text-blue-500",
+    "text-green-500",
+    "text-orange-500",
+    "text-purple-500",
+  ];
+
+  let hash = 0;
+  for (let i = 0; i < seed.length; i += 1) {
+    hash = (hash * 31 + seed.charCodeAt(i)) % colors.length;
+  }
+
+  return colors[hash] || "text-blue-500";
 }

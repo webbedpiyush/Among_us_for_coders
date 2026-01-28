@@ -105,6 +105,30 @@ export function setupSocketHandlers(io: Server, socket: Socket) {
     });
   });
 
+  socket.on("chat_message", (data: { text: string }) => {
+    const lobby = gameManager.getLobbyBySocketId(socket.id);
+    if (!lobby) {
+      socket.emit("error", { message: "Lobby not found" });
+      return;
+    }
+
+    const player = lobby.getPlayer(socket.id);
+    if (!player) {
+      socket.emit("error", { message: "Player not found" });
+      return;
+    }
+
+    const message = {
+      id: `${Date.now()}-${socket.id}`,
+      senderId: socket.id,
+      senderName: player.name,
+      text: data.text.slice(0, 300),
+      isSystem: false,
+    };
+
+    io.to(lobby.code).emit("chat_message", message);
+  });
+
   socket.on("disconnect", () => {
     const lobby = gameManager.getLobbyBySocketId(socket.id);
     if (lobby) {
