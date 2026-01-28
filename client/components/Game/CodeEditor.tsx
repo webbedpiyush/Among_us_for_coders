@@ -6,13 +6,21 @@ interface CodeEditorProps {
   language: string;
   onChange?: (value: string | undefined) => void;
   readOnly?: boolean;
+  onMountEditor?: (editor: any) => void;
 }
 
-export default function CodeEditor({ initialCode, language, onChange, readOnly = false }: CodeEditorProps) {
+export default function CodeEditor({
+  initialCode,
+  language,
+  onChange,
+  readOnly = false,
+  onMountEditor,
+}: CodeEditorProps) {
   const editorRef = useRef<any>(null);
 
   const handleEditorDidMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
+    onMountEditor?.(editor);
     
     // Define custom theme matching our pixel art style
     monaco.editor.defineTheme('retro-theme', {

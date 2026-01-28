@@ -10,6 +10,7 @@ export class Lobby {
   public status: GameState["status"] = "waiting";
   public category?: string;
   public votingTimeLeft?: number;
+  public currentCode: string = ""; // Store current code
   private categoryVotes: Map<string, CategoryId> = new Map();
   private votingTimer?: NodeJS.Timeout;
   private roleRevealTimer?: NodeJS.Timeout;
@@ -86,6 +87,9 @@ export class Lobby {
     this.category = this.pickWinningCategory();
     this.votingTimeLeft = undefined;
 
+    // Set starter code based on category
+    this.currentCode = this.getStarterCode(this.category as CategoryId);
+
     this.assignRoles(io);
     this.status = "role_reveal";
     io.to(this.code).emit("lobby_update", this.state);
@@ -94,6 +98,86 @@ export class Lobby {
       this.status = "playing";
       io.to(this.code).emit("lobby_update", this.state);
     }, 5000);
+  }
+
+  updateCode(newCode: string) {
+    this.currentCode = newCode;
+  }
+
+  private getStarterCode(category: CategoryId): string {
+    const STARTER_CODES: Record<CategoryId, string> = {
+      dsa: `# Binary Search Implementation
+# TODO: Implement binary search to find target in sorted_list
+
+def binary_search(sorted_list, target):
+    left = 0
+    right = len(sorted_list) - 1
+    
+    # Write your logic here
+    
+    return -1
+`,
+      oop: `# Design a Vending Machine Class
+# TODO: Implement methods to manage inventory and process payments
+
+class VendingMachine:
+    def __init__(self):
+        self.inventory = {}
+        self.balance = 0.0
+
+    def add_item(self, item_name, price, quantity):
+        pass
+
+    def purchase(self, item_name, money_inserted):
+        pass
+`,
+      security: `# SQL Injection Prevention
+# TODO: Secure this login function against SQL injection
+
+def login_user(username, password, db_connection):
+    cursor = db_connection.cursor()
+    
+    # VULNERABLE CODE - FIX THIS:
+    query = f"SELECT * FROM users WHERE username = '{username}' AND password = '{password}'"
+    
+    cursor.execute(query)
+    user = cursor.fetchone()
+    return user
+`,
+      frontend: `// React Counter Component
+// TODO: Implement a counter with increment, decrement and reset
+
+import React, { useState } from 'react';
+
+export default function Counter() {
+    const [count, setCount] = useState(0);
+
+    return (
+        <div>
+            <h1>Count: {count}</h1>
+            {/* Add buttons here */}
+        </div>
+    );
+}
+`,
+      backend: `# Express.js API Endpoint
+# TODO: Create a POST endpoint to register a user with validation
+
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+users = []
+
+@app.route('/register', methods=['POST'])
+def register():
+    data = request.json
+    # Add validation and user creation logic here
+    
+    return jsonify({"message": "User registered"}), 201
+`
+    };
+
+    return STARTER_CODES[category] || "# Write your code here\n";
   }
 
   private pickWinningCategory(): CategoryId {
@@ -149,6 +233,7 @@ export class Lobby {
       status: this.status,
       category: this.category,
       votingTimeLeft: this.votingTimeLeft,
+      code: this.currentCode,
     };
   }
 }

@@ -19,4 +19,5 @@ export interface GameState {
   category?: string;
   votingTimeLeft?: number;
   impostorId?: string;
+  code?: string; // Current code in the editor
 }

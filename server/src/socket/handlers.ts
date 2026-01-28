@@ -91,6 +91,20 @@ export function setupSocketHandlers(io: Server, socket: Socket) {
     }
   });
 
+  socket.on("code_update", (data: { code: string }) => {
+    const lobby = gameManager.getLobbyBySocketId(socket.id);
+    if (!lobby) {
+      socket.emit("error", { message: "Lobby not found" });
+      return;
+    }
+
+    lobby.updateCode(data.code);
+    io.to(lobby.code).emit("code_sync", {
+      code: lobby.currentCode,
+      senderId: socket.id,
+    });
+  });
+
   socket.on("disconnect", () => {
     const lobby = gameManager.getLobbyBySocketId(socket.id);
     if (lobby) {

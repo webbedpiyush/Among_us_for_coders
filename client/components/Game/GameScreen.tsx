@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Icon } from "@iconify/react";
 import { GameState, Player } from "@/types/game";
+import { useGame } from "@/context/GameContext";
 import TopBar from "./TopBar";
 import TaskPanel from "./TaskPanel";
 import CodeEditor from "./CodeEditor";
@@ -14,20 +15,55 @@ interface GameScreenProps {
 }
 
 export default function GameScreen({ gameState, currentPlayer }: GameScreenProps) {
-  const [code, setCode] = useState("# Write your code here\nprint('Hello World')");
-  
-  // Dummy messages for UI testing
+  const { updateCode } = useGame();
   const [messages, setMessages] = useState([
     { id: "1", sender: "System", text: "Game started!", color: "text-gray-500", isSystem: true },
     { id: "2", sender: currentPlayer.name, text: "Good luck everyone!", color: "text-blue-500" },
   ]);
-
+  const emitTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const editorRef = useRef<any>(null);
+  const codeRef = useRef<string>(gameState.code || "# Write your code here");
+  
   // Dummy tasks
   const tasks = [
     { id: "1", description: "Implement binary search", completed: false },
     { id: "2", description: "Fix the memory leak", completed: true },
     { id: "3", description: "Validate input", completed: false },
   ];
+
+  useEffect(() => {
+    if (typeof gameState.code !== "string") return;
+    if (gameState.code === codeRef.current) return;
+    codeRef.current = gameState.code;
+
+    if (editorRef.current) {
+      const model = editorRef.current.getModel();
+      if (!model) return;
+
+      const currentValue = model.getValue();
+      if (currentValue !== gameState.code) {
+        const selections = editorRef.current.getSelections() || [];
+        model.pushEditOperations(
+          selections,
+          [{ range: model.getFullModelRange(), text: gameState.code }],
+          () => selections,
+        );
+      }
+    }
+  }, [gameState.code]);
+
+  const handleCodeChange = (value?: string) => {
+    const nextCode = value ?? "";
+    codeRef.current = nextCode;
+
+    if (emitTimerRef.current) {
+      clearTimeout(emitTimerRef.current);
+    }
+
+    emitTimerRef.current = setTimeout(() => {
+      updateCode(nextCode);
+    }, 150);
+  };
 
   return (
     <div className="flex flex-col h-screen bg-[#87CEEB] overflow-hidden">
@@ -51,9 +87,15 @@ export default function GameScreen({ gameState, currentPlayer }: GameScreenProps
         {/* Center: Code Editor */}
         <div className="flex-1 flex flex-col gap-4">
           <CodeEditor 
-            initialCode={code}
+            initialCode={codeRef.current}
             language="python"
-            onChange={(val) => setCode(val || "")}
+            onChange={handleCodeChange}
+            onMountEditor={(editor) => {
+              editorRef.current = editor;
+              if (codeRef.current) {
+                editor.setValue(codeRef.current);
+              }
+            }}
           />
           
           {/* Emergency Button */}

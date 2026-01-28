@@ -13,6 +13,7 @@ interface GameContextType {
   leaveLobby: () => void;
   startGame: () => void;
   voteCategory: (categoryId: string) => void;
+  updateCode: (code: string) => void;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -21,6 +22,7 @@ type GameAction =
   | { type: "SET_GAME_STATE"; payload: GameState }
   | { type: "SET_CURRENT_PLAYER"; payload: Player }
   | { type: "SET_CURRENT_ROLE"; payload: Player["role"] }
+  | { type: "SET_CODE"; payload: string }
   | { type: "RESET_GAME" };
 
 const initialState: { gameState: GameState | null; currentPlayer: Player | null } = {
@@ -46,6 +48,12 @@ function gameReducer(state: typeof initialState, action: GameAction) {
       return {
         ...state,
         currentPlayer: { ...state.currentPlayer, role: action.payload },
+      };
+    case "SET_CODE":
+      if (!state.gameState) return state;
+      return {
+        ...state,
+        gameState: { ...state.gameState, code: action.payload },
       };
     case "RESET_GAME":
       return initialState;
@@ -94,12 +102,19 @@ export function GameProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "SET_CURRENT_ROLE", payload: data.role });
     });
 
+    socket.on("code_sync", (data: { code: string; senderId?: string }) => {
+      // Ignore our own echo to avoid cursor jumps/typing flicker
+      if (data.senderId && data.senderId === socket.id) return;
+      dispatch({ type: "SET_CODE", payload: data.code });
+    });
+
     return () => {
       socket.off("lobby_created");
       socket.off("lobby_joined");
       socket.off("lobby_update");
       socket.off("error");
       socket.off("role_assigned");
+      socket.off("code_sync");
     };
   }, [socket, router]);
 
@@ -136,6 +151,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateCode = (code: string) => {
+    if (socket) {
+      socket.emit("code_update", { code });
+    }
+  };
+
   return (
     <GameContext.Provider
       value={{
@@ -146,6 +167,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         leaveLobby,
         startGame,
         voteCategory,
+        updateCode,
       }}
     >
       {children}
