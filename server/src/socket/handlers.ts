@@ -1,5 +1,7 @@
 import { Server, Socket } from "socket.io";
 import { gameManager } from "../game/GameManager";
+import { getChallengeByCategory } from "../game/challenges";
+import { runAiTests } from "../game/AiTestRunner";
 import type { Player } from "../types";
 
 export function setupSocketHandlers(io: Server, socket: Socket) {
@@ -127,6 +129,31 @@ export function setupSocketHandlers(io: Server, socket: Socket) {
     };
 
     io.to(lobby.code).emit("chat_message", message);
+  });
+
+  socket.on("run_tests", async (data: { code: string }) => {
+    const lobby = gameManager.getLobbyBySocketId(socket.id);
+    if (!lobby) {
+      socket.emit("error", { message: "Lobby not found" });
+      return;
+    }
+
+    const challenge = getChallengeByCategory(lobby.category);
+    if (!challenge) {
+      socket.emit("error", { message: "Challenge not found" });
+      return;
+    }
+
+    try {
+      const results = await runAiTests(data.code, challenge);
+      io.to(lobby.code).emit("test_results", results);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "AI test execution failed";
+      console.error("AI run_tests error:", message);
+      socket.emit("error", { message });
+      io.to(lobby.code).emit("test_results", []);
+    }
   });
 
   socket.on("disconnect", () => {

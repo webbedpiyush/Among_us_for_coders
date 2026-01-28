@@ -15,7 +15,7 @@ interface GameScreenProps {
 }
 
 export default function GameScreen({ gameState, currentPlayer }: GameScreenProps) {
-  const { updateCode, chatMessages, sendChatMessage } = useGame();
+  const { updateCode, chatMessages, sendChatMessage, testResults, isTesting, runTests } = useGame();
   const emitTimerRef = useRef<NodeJS.Timeout | null>(null);
   const editorRef = useRef<any>(null);
   const codeRef = useRef<string>(gameState.code || "# Write your code here");
@@ -78,6 +78,12 @@ export default function GameScreen({ gameState, currentPlayer }: GameScreenProps
         <TaskPanel 
           role={currentPlayer.role || "civilian"} 
           tasks={tasks}
+          tests={testResults.map((result) => ({
+            name: result.name,
+            passed: result.passed,
+          }))}
+          isTesting={isTesting}
+          onRunTests={() => runTests(codeRef.current)}
         />
 
         {/* Center: Code Editor */}

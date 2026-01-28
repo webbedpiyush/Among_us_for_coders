@@ -9,6 +9,8 @@ interface GameContextType {
   gameState: GameState | null;
   currentPlayer: Player | null;
   chatMessages: ChatMessage[];
+  testResults: TestResult[];
+  isTesting: boolean;
   createLobby: (playerName: string) => void;
   joinLobby: (lobbyCode: string, playerName: string) => void;
   leaveLobby: () => void;
@@ -16,6 +18,7 @@ interface GameContextType {
   voteCategory: (categoryId: string) => void;
   updateCode: (code: string) => void;
   sendChatMessage: (text: string) => void;
+  runTests: (code: string) => void;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -28,22 +31,35 @@ export interface ChatMessage {
   isSystem?: boolean;
 }
 
+export interface TestResult {
+  name: string;
+  passed: boolean;
+  output?: string;
+  error?: string;
+}
+
 type GameAction =
   | { type: "SET_GAME_STATE"; payload: GameState }
   | { type: "SET_CURRENT_PLAYER"; payload: Player }
   | { type: "SET_CURRENT_ROLE"; payload: Player["role"] }
   | { type: "SET_CODE"; payload: string }
   | { type: "ADD_CHAT_MESSAGE"; payload: ChatMessage }
+  | { type: "SET_TEST_RESULTS"; payload: TestResult[] }
+  | { type: "SET_TESTING"; payload: boolean }
   | { type: "RESET_GAME" };
 
 const initialState: {
   gameState: GameState | null;
   currentPlayer: Player | null;
   chatMessages: ChatMessage[];
+  testResults: TestResult[];
+  isTesting: boolean;
 } = {
   gameState: null,
   currentPlayer: null,
   chatMessages: [],
+  testResults: [],
+  isTesting: false,
 };
 
 function gameReducer(state: typeof initialState, action: GameAction) {
@@ -73,6 +89,10 @@ function gameReducer(state: typeof initialState, action: GameAction) {
       };
     case "ADD_CHAT_MESSAGE":
       return { ...state, chatMessages: [...state.chatMessages, action.payload] };
+    case "SET_TEST_RESULTS":
+      return { ...state, testResults: action.payload, isTesting: false };
+    case "SET_TESTING":
+      return { ...state, isTesting: action.payload };
     case "RESET_GAME":
       return initialState;
     default:
@@ -112,6 +132,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     });
 
     socket.on("error", (error: { message: string }) => {
+      dispatch({ type: "SET_TESTING", payload: false });
       alert(`Error: ${error.message}`);
     });
 
@@ -130,6 +151,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "ADD_CHAT_MESSAGE", payload: data });
     });
 
+    socket.on("test_results", (data: TestResult[]) => {
+      dispatch({ type: "SET_TEST_RESULTS", payload: data });
+    });
+
     return () => {
       socket.off("lobby_created");
       socket.off("lobby_joined");
@@ -138,6 +163,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       socket.off("role_assigned");
       socket.off("code_sync");
       socket.off("chat_message");
+      socket.off("test_results");
     };
   }, [socket, router]);
 
@@ -186,12 +212,21 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const runTests = (code: string) => {
+    if (socket) {
+      dispatch({ type: "SET_TESTING", payload: true });
+      socket.emit("run_tests", { code });
+    }
+  };
+
   return (
     <GameContext.Provider
       value={{
         gameState: state.gameState,
         currentPlayer: state.currentPlayer,
         chatMessages: state.chatMessages,
+        testResults: state.testResults,
+        isTesting: state.isTesting,
         createLobby,
         joinLobby,
         leaveLobby,
@@ -199,6 +234,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         voteCategory,
         updateCode,
         sendChatMessage,
+        runTests,
       }}
     >
       {children}
