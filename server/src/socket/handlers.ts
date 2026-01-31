@@ -132,6 +132,22 @@ export function setupSocketHandlers(io: Server, socket: Socket) {
     io.to(lobby.code).emit("chat_message", message);
   });
 
+  socket.on("call_meeting", () => {
+    const lobby = gameManager.getLobbyBySocketId(socket.id);
+    if (!lobby) {
+      socket.emit("error", { message: "Lobby not found" });
+      return;
+    }
+
+    const player = lobby.getPlayer(socket.id);
+    if (!player) {
+      socket.emit("error", { message: "Player not found" });
+      return;
+    }
+
+    io.to(lobby.code).emit("meeting_called", { callerName: player.name });
+  });
+
   socket.on("run_tests", async (data: { code: string }) => {
     const lobby = gameManager.getLobbyBySocketId(socket.id);
     if (!lobby) {

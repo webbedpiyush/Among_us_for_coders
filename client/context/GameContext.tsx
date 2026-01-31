@@ -18,6 +18,8 @@ interface GameContextType {
   testResults: TestResult[];
   isTesting: boolean;
   sabotageTasks: SabotageTask[];
+  meetingActive: boolean;
+  meetingCallerName: string | null;
   createLobby: (playerName: string) => void;
   joinLobby: (lobbyCode: string, playerName: string) => void;
   leaveLobby: () => void;
@@ -26,6 +28,8 @@ interface GameContextType {
   updateCode: (code: string) => void;
   sendChatMessage: (text: string) => void;
   runTests: (code: string) => void;
+  callMeeting: () => void;
+  dismissMeeting: () => void;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -60,6 +64,10 @@ type GameAction =
   | { type: "SET_TEST_RESULTS"; payload: TestResult[] }
   | { type: "SET_TESTING"; payload: boolean }
   | { type: "SET_SABOTAGE_TASKS"; payload: SabotageTask[] }
+  | {
+      type: "SET_MEETING";
+      payload: { active: boolean; callerName: string | null };
+    }
   | { type: "RESET_GAME" };
 
 const initialState: {
@@ -69,6 +77,8 @@ const initialState: {
   testResults: TestResult[];
   isTesting: boolean;
   sabotageTasks: SabotageTask[];
+  meetingActive: boolean;
+  meetingCallerName: string | null;
 } = {
   gameState: null,
   currentPlayer: null,
@@ -76,6 +86,8 @@ const initialState: {
   testResults: [],
   isTesting: false,
   sabotageTasks: [],
+  meetingActive: false,
+  meetingCallerName: null,
 };
 
 function gameReducer(state: typeof initialState, action: GameAction) {
@@ -114,6 +126,12 @@ function gameReducer(state: typeof initialState, action: GameAction) {
       return { ...state, isTesting: action.payload };
     case "SET_SABOTAGE_TASKS":
       return { ...state, sabotageTasks: action.payload };
+    case "SET_MEETING":
+      return {
+        ...state,
+        meetingActive: action.payload.active,
+        meetingCallerName: action.payload.callerName,
+      };
     case "RESET_GAME":
       return initialState;
     default:
@@ -190,6 +208,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "SET_SABOTAGE_TASKS", payload: data.tasks });
     });
 
+    socket.on("meeting_called", (data: { callerName: string }) => {
+      dispatch({
+        type: "SET_MEETING",
+        payload: { active: true, callerName: data.callerName },
+      });
+    });
+
     return () => {
       socket.off("lobby_created");
       socket.off("lobby_joined");
@@ -201,6 +226,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       socket.off("test_results");
       socket.off("sabotage_tasks");
       socket.off("sabotage_update");
+      socket.off("meeting_called");
     };
   }, [socket, router]);
 
@@ -256,6 +282,19 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const callMeeting = () => {
+    if (socket) {
+      socket.emit("call_meeting");
+    }
+  };
+
+  const dismissMeeting = () => {
+    dispatch({
+      type: "SET_MEETING",
+      payload: { active: false, callerName: null },
+    });
+  };
+
   return (
     <GameContext.Provider
       value={{
@@ -265,6 +304,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
         testResults: state.testResults,
         isTesting: state.isTesting,
         sabotageTasks: state.sabotageTasks,
+        meetingActive: state.meetingActive,
+        meetingCallerName: state.meetingCallerName,
         createLobby,
         joinLobby,
         leaveLobby,
@@ -273,6 +314,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
         updateCode,
         sendChatMessage,
         runTests,
+        callMeeting,
+        dismissMeeting,
       }}>
       {children}
     </GameContext.Provider>

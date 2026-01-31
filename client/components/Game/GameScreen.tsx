@@ -8,6 +8,7 @@ import TopBar from "./TopBar";
 import TaskPanel from "./TaskPanel";
 import CodeEditor from "./CodeEditor";
 import Chat from "./Chat";
+import EmergencyOverlay from "./EmergencyOverlay";
 
 interface GameScreenProps {
   gameState: GameState;
@@ -26,6 +27,10 @@ export default function GameScreen({
     isTesting,
     runTests,
     sabotageTasks,
+    meetingActive,
+    meetingCallerName,
+    callMeeting,
+    dismissMeeting,
   } = useGame();
   const emitTimerRef = useRef<NodeJS.Timeout | null>(null);
   const editorRef = useRef<any>(null);
@@ -69,6 +74,12 @@ export default function GameScreen({
 
   return (
     <div className="flex flex-col h-screen bg-[#87CEEB] overflow-hidden">
+      {meetingActive && meetingCallerName && (
+        <EmergencyOverlay
+          callerName={meetingCallerName}
+          onClose={dismissMeeting}
+        />
+      )}
       {/* Top Bar */}
       <TopBar
         round={1}
@@ -110,7 +121,9 @@ export default function GameScreen({
 
           {/* Emergency Button */}
           <div className="flex justify-end">
-            <button className="bg-[#ff4757] text-white font-bold text-xl px-6 py-3 border-4 border-black shadow-[4px_4px_0_rgba(0,0,0,1)] hover:bg-[#ff6b81] active:translate-y-1 active:shadow-none transition-all flex items-center gap-2">
+            <button
+              onClick={callMeeting}
+              className="bg-[#ff4757] text-white font-bold text-xl px-6 py-3 border-4 border-black shadow-[4px_4px_0_rgba(0,0,0,1)] hover:bg-[#ff6b81] active:translate-y-1 active:shadow-none transition-all flex items-center gap-2">
               <Icon icon="lucide:siren" className="animate-pulse" />
               EMERGENCY MEETING
             </button>
