@@ -14,12 +14,22 @@ interface GameScreenProps {
   currentPlayer: Player;
 }
 
-export default function GameScreen({ gameState, currentPlayer }: GameScreenProps) {
-  const { updateCode, chatMessages, sendChatMessage, testResults, isTesting, runTests } = useGame();
+export default function GameScreen({
+  gameState,
+  currentPlayer,
+}: GameScreenProps) {
+  const {
+    updateCode,
+    chatMessages,
+    sendChatMessage,
+    testResults,
+    isTesting,
+    runTests,
+  } = useGame();
   const emitTimerRef = useRef<NodeJS.Timeout | null>(null);
   const editorRef = useRef<any>(null);
   const codeRef = useRef<string>(gameState.code || "# Write your code here");
-  
+
   // Dummy tasks
   const tasks = [
     { id: "1", description: "Implement binary search", completed: false },
@@ -64,8 +74,8 @@ export default function GameScreen({ gameState, currentPlayer }: GameScreenProps
   return (
     <div className="flex flex-col h-screen bg-[#87CEEB] overflow-hidden">
       {/* Top Bar */}
-      <TopBar 
-        round={1} 
+      <TopBar
+        round={1}
         category={gameState.category || "Unknown"}
         timeLeft={300} // 5 mins dummy
         aliveCount={gameState.players.length}
@@ -75,12 +85,14 @@ export default function GameScreen({ gameState, currentPlayer }: GameScreenProps
       {/* Main Content Area */}
       <div className="flex flex-1 overflow-hidden p-4 gap-4">
         {/* Left Panel: Tasks */}
-        <TaskPanel 
-          role={currentPlayer.role || "civilian"} 
+        <TaskPanel
+          role={currentPlayer.role || "civilian"}
           tasks={tasks}
           tests={testResults.map((result) => ({
             name: result.name,
             passed: result.passed,
+            output: result.output,
+            error: result.error,
           }))}
           isTesting={isTesting}
           onRunTests={() => runTests(codeRef.current)}
@@ -88,7 +100,7 @@ export default function GameScreen({ gameState, currentPlayer }: GameScreenProps
 
         {/* Center: Code Editor */}
         <div className="flex-1 flex flex-col gap-4">
-          <CodeEditor 
+          <CodeEditor
             initialCode={codeRef.current}
             language="python"
             onChange={handleCodeChange}
@@ -99,7 +111,7 @@ export default function GameScreen({ gameState, currentPlayer }: GameScreenProps
               }
             }}
           />
-          
+
           {/* Emergency Button */}
           <div className="flex justify-end">
             <button className="bg-[#ff4757] text-white font-bold text-xl px-6 py-3 border-4 border-black shadow-[4px_4px_0_rgba(0,0,0,1)] hover:bg-[#ff6b81] active:translate-y-1 active:shadow-none transition-all flex items-center gap-2">
@@ -110,7 +122,7 @@ export default function GameScreen({ gameState, currentPlayer }: GameScreenProps
         </div>
 
         {/* Right Panel: Chat */}
-        <Chat 
+        <Chat
           messages={chatMessages.map((msg) => ({
             id: msg.id,
             sender: msg.senderName,
