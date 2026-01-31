@@ -4,10 +4,17 @@ export interface TestCase {
   expectedOutput: string;
 }
 
+export interface SabotageTask {
+  id: string;
+  description: string;
+  pattern: string; // Regex pattern checked against code
+}
+
 export interface Challenge {
   category: "dsa" | "oop" | "security" | "frontend" | "backend";
   languageId: number;
   testCases: TestCase[];
+  sabotageTasks: SabotageTask[];
 }
 
 const CHALLENGES: Challenge[] = [
@@ -26,6 +33,18 @@ const CHALLENGES: Challenge[] = [
         expectedOutput: "-1\n",
       },
     ],
+    sabotageTasks: [
+      {
+        id: "dsa-1",
+        description: "Make binary_search always return 0",
+        pattern: "return\\s+0",
+      },
+      {
+        id: "dsa-2",
+        description: "Remove the while loop condition",
+        pattern: "while\\s+True",
+      },
+    ],
   },
   {
     category: "oop",
@@ -33,7 +52,8 @@ const CHALLENGES: Challenge[] = [
     testCases: [
       {
         name: "add item",
-        testCode: "vm = VendingMachine()\nvm.add_item('soda', 1.5, 2)\nprint(len(vm.inventory))",
+        testCode:
+          "vm = VendingMachine()\nvm.add_item('soda', 1.5, 2)\nprint(len(vm.inventory))",
         expectedOutput: "1\n",
       },
       {
@@ -41,6 +61,18 @@ const CHALLENGES: Challenge[] = [
         testCode:
           "vm = VendingMachine()\nvm.add_item('soda', 1.5, 1)\nprint(vm.purchase('soda', 2.0))",
         expectedOutput: "0.5\n",
+      },
+    ],
+    sabotageTasks: [
+      {
+        id: "oop-1",
+        description: "Set price to 0 in purchase()",
+        pattern: "price\\s*=\\s*0",
+      },
+      {
+        id: "oop-2",
+        description: "Increase balance instead of decreasing",
+        pattern: "balance\\s*\\+\\=",
       },
     ],
   },
@@ -55,6 +87,13 @@ const CHALLENGES: Challenge[] = [
         expectedOutput: "ok\n",
       },
     ],
+    sabotageTasks: [
+      {
+        id: "sec-1",
+        description: "Keep raw SQL string formatting",
+        pattern: 'f"SELECT \\* FROM users',
+      },
+    ],
   },
   {
     category: "frontend",
@@ -64,6 +103,13 @@ const CHALLENGES: Challenge[] = [
         name: "component defined",
         testCode: "console.log(typeof Counter === 'function')",
         expectedOutput: "true\n",
+      },
+    ],
+    sabotageTasks: [
+      {
+        id: "fe-1",
+        description: "Make count start at 100",
+        pattern: "useState\\(100\\)",
       },
     ],
   },
@@ -77,10 +123,19 @@ const CHALLENGES: Challenge[] = [
         expectedOutput: "register\n",
       },
     ],
+    sabotageTasks: [
+      {
+        id: "be-1",
+        description: "Return 500 status always",
+        pattern: "return\\s+jsonify\\(.*\\),\\s*500",
+      },
+    ],
   },
 ];
 
 export function getChallengeByCategory(category: string | undefined) {
   if (!category) return null;
-  return CHALLENGES.find((challenge) => challenge.category === category) || null;
+  return (
+    CHALLENGES.find((challenge) => challenge.category === category) || null
+  );
 }

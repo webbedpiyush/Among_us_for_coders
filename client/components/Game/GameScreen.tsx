@@ -25,17 +25,13 @@ export default function GameScreen({
     testResults,
     isTesting,
     runTests,
+    sabotageTasks,
   } = useGame();
   const emitTimerRef = useRef<NodeJS.Timeout | null>(null);
   const editorRef = useRef<any>(null);
   const codeRef = useRef<string>(gameState.code || "# Write your code here");
 
-  // Dummy tasks
-  const tasks = [
-    { id: "1", description: "Implement binary search", completed: false },
-    { id: "2", description: "Fix the memory leak", completed: true },
-    { id: "3", description: "Validate input", completed: false },
-  ];
+  const isImpostor = currentPlayer.role === "impostor";
 
   useEffect(() => {
     if (typeof gameState.code !== "string") return;
@@ -87,7 +83,7 @@ export default function GameScreen({
         {/* Left Panel: Tasks */}
         <TaskPanel
           role={currentPlayer.role || "civilian"}
-          tasks={tasks}
+          tasks={isImpostor ? sabotageTasks : []}
           tests={testResults.map((result) => ({
             name: result.name,
             passed: result.passed,

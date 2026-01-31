@@ -1,4 +1,6 @@
 import type { Player, GameState } from "../types";
+import { getChallengeByCategory } from "./challenges";
+import type { SabotageTask } from "./challenges";
 import type { Server } from "socket.io";
 
 const CATEGORY_IDS = ["dsa", "oop", "security", "frontend", "backend"] as const;
@@ -11,6 +13,8 @@ export class Lobby {
   public category?: string;
   public votingTimeLeft?: number;
   public currentCode: string = ""; // Store current code
+  private impostorSocketId?: string;
+  private sabotageTasks: Array<SabotageTask & { completed: boolean }> = [];
   private categoryVotes: Map<string, CategoryId> = new Map();
   private votingTimer?: NodeJS.Timeout;
   private roleRevealTimer?: NodeJS.Timeout;
@@ -89,6 +93,7 @@ export class Lobby {
 
     // Set starter code based on category
     this.currentCode = this.getStarterCode(this.category as CategoryId);
+    this.prepareSabotageTasks();
 
     this.assignRoles(io);
     this.status = "role_reveal";
@@ -102,6 +107,38 @@ export class Lobby {
 
   updateCode(newCode: string) {
     this.currentCode = newCode;
+  }
+
+  private prepareSabotageTasks() {
+    const challenge = getChallengeByCategory(this.category);
+    this.sabotageTasks = (challenge?.sabotageTasks || []).map((task) => ({
+      ...task,
+      completed: false,
+    }));
+  }
+
+  evaluateSabotage(io: Server) {
+    if (!this.impostorSocketId || this.sabotageTasks.length === 0) return;
+    let changed = false;
+
+    for (const task of this.sabotageTasks) {
+      if (task.completed) continue;
+      const regex = new RegExp(task.pattern, "m");
+      if (regex.test(this.currentCode)) {
+        task.completed = true;
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      io.to(this.impostorSocketId).emit("sabotage_update", {
+        tasks: this.sabotageTasks.map(({ id, description, completed }) => ({
+          id,
+          description,
+          completed,
+        })),
+      });
+    }
   }
 
   private getStarterCode(category: CategoryId): string {
@@ -174,7 +211,7 @@ def register():
     # Add validation and user creation logic here
     
     return jsonify({"message": "User registered"}), 201
-`
+`,
     };
 
     return STARTER_CODES[category] || "# Write your code here\n";
@@ -219,11 +256,24 @@ def register():
     const impostorIndex = Math.floor(Math.random() * this.players.length);
     this.players.forEach((player, index) => {
       player.role = index === impostorIndex ? "impostor" : "civilian";
+      if (player.role === "impostor") {
+        this.impostorSocketId = player.socketId;
+      }
       io.to(player.socketId).emit("role_assigned", {
         role: player.role,
         category: this.category,
       });
     });
+
+    if (this.impostorSocketId) {
+      io.to(this.impostorSocketId).emit("sabotage_tasks", {
+        tasks: this.sabotageTasks.map(({ id, description, completed }) => ({
+          id,
+          description,
+          completed,
+        })),
+      });
+    }
   }
 
   get state(): GameState {

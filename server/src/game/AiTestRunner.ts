@@ -1,6 +1,7 @@
-import { generateText } from "ai";
+import { generateObject } from "ai";
 import { google } from "@ai-sdk/google";
 import type { Challenge, TestCase } from "./challenges";
+import { z } from "zod";
 
 interface AiTestResult {
   name: string;
@@ -9,9 +10,16 @@ interface AiTestResult {
   error?: string;
 }
 
-const MODEL = "gemini-2.5-pro";
-const MAX_RETRIES = 2;
+const MODEL = "gemini-2.5-flash";
+const MAX_RETRIES = 3;
 const TIMEOUT_MS = 12000;
+
+function extractJsonFromText(text: string) {
+  const trimmed = text.trim();
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) return trimmed;
+  const match = trimmed.match(/\{[\s\S]*\}/);
+  return match ? match[0] : null;
+}
 
 function buildPrompt(code: string, challenge: Challenge, testCase: TestCase) {
   return [
@@ -39,39 +47,40 @@ function buildPrompt(code: string, challenge: Challenge, testCase: TestCase) {
   ].join("\n");
 }
 
-function extractJson(text: string) {
-  const trimmed = text.trim();
-  if (trimmed.startsWith("{") && trimmed.endsWith("}")) return trimmed;
-  const match = trimmed.match(/\{[\s\S]*\}/);
-  return match ? match[0] : "";
-}
-
-function safeJsonParse(text: string) {
-  try {
-    const cleaned = extractJson(text)
-      .replace(/^```json/i, "")
-      .replace(/```$/i, "")
-      .trim();
-    if (!cleaned) return null;
-    return JSON.parse(cleaned);
-  } catch {
-    return null;
-  }
-}
+const resultSchema = z.object({
+  passed: z.boolean(),
+  output: z.string(),
+  error: z.string().nullable(),
+});
 
 async function generateWithTimeout(prompt: string) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
-    const { text } = await generateText({
+    const { object } = await generateObject({
       model: google(MODEL),
+      schema: resultSchema,
+      schemaName: "TestCaseEvaluation",
+      schemaDescription:
+        "Deterministic evaluation of code against a test case.",
       prompt,
-      maxOutputTokens: 256,
       temperature: 0,
+      maxOutputTokens: 256,
+      maxRetries: MAX_RETRIES,
+      seed: 1,
+      experimental_repairText: async ({ text, error }) => {
+        console.error("AI schema parse error:", error?.message || error);
+        console.error("AI raw response:", text);
+        const extracted = extractJsonFromText(
+          text.replace(/```json/gi, "").replace(/```/g, ""),
+        );
+        return extracted;
+      },
       abortSignal: controller.signal,
     });
-    return text;
+    console.log(object);
+    return object;
   } finally {
     clearTimeout(timeout);
   }
@@ -92,37 +101,25 @@ export async function runAiTests(
   const results: AiTestResult[] = [];
   for (const testCase of challenge.testCases) {
     const prompt = buildPrompt(code, challenge, testCase);
-    let parsed: any = null;
-    let lastError = "AI response parse error";
-
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
-      try {
-        const text = await generateWithTimeout(prompt);
-        parsed = safeJsonParse(text);
-        if (parsed && typeof parsed.passed === "boolean") break;
-        lastError = "AI response parse error";
-      } catch (error) {
-        lastError =
-          error instanceof Error ? error.message : "AI generation failed";
-      }
-    }
-
-    if (!parsed || typeof parsed.passed !== "boolean") {
+    try {
+      const parsed = await generateWithTimeout(prompt);
+      results.push({
+        name: testCase.name,
+        passed: parsed.passed,
+        output: parsed.output,
+        error: parsed.error || undefined,
+      });
+      console.log(results);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "AI generation failed";
       results.push({
         name: testCase.name,
         passed: false,
         output: "",
-        error: lastError,
+        error: message,
       });
-      continue;
     }
-
-    results.push({
-      name: testCase.name,
-      passed: parsed.passed,
-      output: typeof parsed.output === "string" ? parsed.output : "",
-      error: typeof parsed.error === "string" ? parsed.error : undefined,
-    });
   }
 
   return results;

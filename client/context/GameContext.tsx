@@ -1,6 +1,12 @@
 "use client";
 
-import { createContext, useContext, useEffect, useReducer, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useReducer,
+  ReactNode,
+} from "react";
 import { useSocket } from "@/hooks/useSocket";
 import { GameState, Player } from "@/types/game";
 import { useRouter } from "next/navigation";
@@ -11,6 +17,7 @@ interface GameContextType {
   chatMessages: ChatMessage[];
   testResults: TestResult[];
   isTesting: boolean;
+  sabotageTasks: SabotageTask[];
   createLobby: (playerName: string) => void;
   joinLobby: (lobbyCode: string, playerName: string) => void;
   leaveLobby: () => void;
@@ -38,6 +45,12 @@ export interface TestResult {
   error?: string;
 }
 
+export interface SabotageTask {
+  id: string;
+  description: string;
+  completed: boolean;
+}
+
 type GameAction =
   | { type: "SET_GAME_STATE"; payload: GameState }
   | { type: "SET_CURRENT_PLAYER"; payload: Player }
@@ -46,6 +59,7 @@ type GameAction =
   | { type: "ADD_CHAT_MESSAGE"; payload: ChatMessage }
   | { type: "SET_TEST_RESULTS"; payload: TestResult[] }
   | { type: "SET_TESTING"; payload: boolean }
+  | { type: "SET_SABOTAGE_TASKS"; payload: SabotageTask[] }
   | { type: "RESET_GAME" };
 
 const initialState: {
@@ -54,12 +68,14 @@ const initialState: {
   chatMessages: ChatMessage[];
   testResults: TestResult[];
   isTesting: boolean;
+  sabotageTasks: SabotageTask[];
 } = {
   gameState: null,
   currentPlayer: null,
   chatMessages: [],
   testResults: [],
   isTesting: false,
+  sabotageTasks: [],
 };
 
 function gameReducer(state: typeof initialState, action: GameAction) {
@@ -88,11 +104,16 @@ function gameReducer(state: typeof initialState, action: GameAction) {
         gameState: { ...state.gameState, code: action.payload },
       };
     case "ADD_CHAT_MESSAGE":
-      return { ...state, chatMessages: [...state.chatMessages, action.payload] };
+      return {
+        ...state,
+        chatMessages: [...state.chatMessages, action.payload],
+      };
     case "SET_TEST_RESULTS":
       return { ...state, testResults: action.payload, isTesting: false };
     case "SET_TESTING":
       return { ...state, isTesting: action.payload };
+    case "SET_SABOTAGE_TASKS":
+      return { ...state, sabotageTasks: action.payload };
     case "RESET_GAME":
       return initialState;
     default:
@@ -108,24 +129,30 @@ export function GameProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!socket) return;
 
-    socket.on("lobby_created", (data: { lobbyCode: string; playerId: string }) => {
-      console.log("Lobby created:", data);
-      // We wait for lobby_update to set full state, but we can set ID here if needed
-      router.push(`/lobby/${data.lobbyCode}`);
-    });
+    socket.on(
+      "lobby_created",
+      (data: { lobbyCode: string; playerId: string }) => {
+        console.log("Lobby created:", data);
+        // We wait for lobby_update to set full state, but we can set ID here if needed
+        router.push(`/lobby/${data.lobbyCode}`);
+      },
+    );
 
-    socket.on("lobby_joined", (data: { lobbyCode: string; playerId: string }) => {
-      console.log("Joined lobby:", data);
-      router.push(`/lobby/${data.lobbyCode}`);
-    });
+    socket.on(
+      "lobby_joined",
+      (data: { lobbyCode: string; playerId: string }) => {
+        console.log("Joined lobby:", data);
+        router.push(`/lobby/${data.lobbyCode}`);
+      },
+    );
 
     socket.on("lobby_update", (gameState: GameState) => {
       console.log("Lobby update:", gameState);
       dispatch({ type: "SET_GAME_STATE", payload: gameState });
-      
+
       // Update current player info if we have the ID but not the full object
       // This logic relies on socket.id matching player.id from server
-      const myPlayer = gameState.players.find(p => p.socketId === socket.id);
+      const myPlayer = gameState.players.find((p) => p.socketId === socket.id);
       if (myPlayer) {
         dispatch({ type: "SET_CURRENT_PLAYER", payload: myPlayer });
       }
@@ -155,6 +182,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "SET_TEST_RESULTS", payload: data });
     });
 
+    socket.on("sabotage_tasks", (data: { tasks: SabotageTask[] }) => {
+      dispatch({ type: "SET_SABOTAGE_TASKS", payload: data.tasks });
+    });
+
+    socket.on("sabotage_update", (data: { tasks: SabotageTask[] }) => {
+      dispatch({ type: "SET_SABOTAGE_TASKS", payload: data.tasks });
+    });
+
     return () => {
       socket.off("lobby_created");
       socket.off("lobby_joined");
@@ -164,6 +199,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       socket.off("code_sync");
       socket.off("chat_message");
       socket.off("test_results");
+      socket.off("sabotage_tasks");
+      socket.off("sabotage_update");
     };
   }, [socket, router]);
 
@@ -227,6 +264,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         chatMessages: state.chatMessages,
         testResults: state.testResults,
         isTesting: state.isTesting,
+        sabotageTasks: state.sabotageTasks,
         createLobby,
         joinLobby,
         leaveLobby,
@@ -235,8 +273,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         updateCode,
         sendChatMessage,
         runTests,
-      }}
-    >
+      }}>
       {children}
     </GameContext.Provider>
   );

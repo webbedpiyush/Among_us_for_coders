@@ -101,6 +101,7 @@ export function setupSocketHandlers(io: Server, socket: Socket) {
     }
 
     lobby.updateCode(data.code);
+    lobby.evaluateSabotage(io);
     io.to(lobby.code).emit("code_sync", {
       code: lobby.currentCode,
       senderId: socket.id,
